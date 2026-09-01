@@ -4,61 +4,233 @@
   <meta charset="utf-8" />
   <title>Form Pilot</title>
   <style>
-    body { font-family: system-ui, sans-serif; max-width: 640px; margin: 40px auto; padding: 0 16px; color: #202124; }
-    h1 { font-size: 20px; }
-    .topbar { display: flex; justify-content: space-between; align-items: baseline; }
-    .topbar button { font-size: 12px; padding: 6px 10px; background: none; border: 1px solid #dadce0; border-radius: 6px; }
-    #chat { display: flex; flex-direction: column; gap: 12px; margin-bottom: 16px; }
-    .msg-wrap { display: flex; flex-direction: column; max-width: 80%; }
+    * { box-sizing: border-box; }
+    body {
+      font-family: "Google Sans", "Segoe UI", system-ui, sans-serif;
+      margin: 0;
+      background: #f1f3f9;
+      color: #202124;
+    }
+    button { font-family: inherit; cursor: pointer; }
+    input, select { font-family: inherit; font-size: 14px; }
+
+    .topbar {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 12px 24px; background: #fff; border-bottom: 1px solid #e3e5e8;
+    }
+    .topbar h1 { font-size: 18px; margin: 0; font-weight: 600; }
+    .topbar .top-actions { display: flex; gap: 8px; }
+
+    .btn {
+      padding: 8px 14px; font-size: 13px; border-radius: 8px; border: 1px solid #dadce0;
+      background: #fff; color: #202124;
+    }
+    .btn:hover { background: #f8f9fa; }
+    .btn:disabled { opacity: 0.45; cursor: default; }
+    .btn:disabled:hover { background: #fff; }
+    .btn-primary { background: #4d5bf9; border-color: #4d5bf9; color: #fff; }
+    .btn-primary:hover { background: #3f4cf0; }
+    .btn-danger { border-color: #d93025; color: #d93025; }
+    .icon-btn {
+      width: 28px; height: 28px; border-radius: 6px; border: 1px solid transparent;
+      background: none; font-size: 14px; display: inline-flex; align-items: center;
+      justify-content: center; color: #5f6368;
+    }
+    .icon-btn:hover { background: #f1f3f4; }
+    .icon-btn.danger:hover { background: #fce8e6; color: #d93025; }
+    .icon-btn:disabled { opacity: 0.35; }
+    .icon-btn:disabled:hover { background: none; }
+
+    .layout {
+      display: grid; grid-template-columns: 420px 1fr; gap: 20px;
+      max-width: 1200px; margin: 20px auto; padding: 0 20px; align-items: start;
+    }
+    @media (max-width: 900px) {
+      .layout { grid-template-columns: 1fr; margin: 12px auto; padding: 0 12px; }
+    }
+
+    .chat-pane {
+      background: #fff; border: 1px solid #e3e5e8; border-radius: 12px; padding: 16px;
+      display: flex; flex-direction: column; height: calc(100vh - 110px); min-height: 420px;
+      min-width: 0;
+    }
+    @media (max-width: 900px) { .chat-pane { height: 60vh; } }
+
+    .intro { font-size: 13px; color: #5f6368; margin: 0 0 12px; }
+    #chat { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; padding-right: 4px; }
+    .msg-wrap { display: flex; flex-direction: column; max-width: 85%; }
     .msg-wrap.user { align-self: flex-end; align-items: flex-end; }
     .msg-wrap.agent { align-self: flex-start; align-items: flex-start; }
     .msg-label { font-size: 11px; color: #5f6368; margin-bottom: 3px; margin-left: 2px; }
-    .msg { padding: 10px 14px; border-radius: 8px; white-space: pre-wrap; }
-    .msg.user { background: #e8eaed; }
-    .msg.agent { background: #e8f0fe; }
+    .msg { padding: 9px 13px; border-radius: 10px; white-space: pre-wrap; font-size: 14px; line-height: 1.4; }
+    .msg.user { background: #4d5bf9; color: #fff; }
+    .msg.agent { background: #f1f3f4; }
     .msg.loading { color: #5f6368; animation: pulse 1.2s ease-in-out infinite; }
     @keyframes pulse { 0%, 100% { opacity: 0.4; } 50% { opacity: 1; } }
     button:disabled, input:disabled { opacity: 0.6; cursor: default; }
-    #composer { display: flex; gap: 8px; }
-    #composer input { flex: 1; padding: 10px; font-size: 14px; }
-    button { padding: 10px 16px; font-size: 14px; cursor: pointer; }
-    #preview { border: 1px solid #dadce0; border-radius: 8px; padding: 16px; margin-top: 16px; }
-    #preview h2 { margin-top: 0; font-size: 16px; }
-    .assumptions { background: #fef7e0; border-radius: 6px; padding: 10px 12px; margin: 10px 0; }
+
+    #composer { display: flex; gap: 8px; margin-top: 12px; flex-shrink: 0; }
+    #composer input {
+      flex: 1; min-width: 0; padding: 10px 12px; border-radius: 8px; border: 1px solid #dadce0;
+    }
+    #composer input:focus { outline: none; border-color: #4d5bf9; }
+
+    #error {
+      color: #d93025; margin-top: 8px; display: flex; align-items: center; gap: 10px; font-size: 13px;
+    }
+    #error.hidden { display: none; }
+    #error button {
+      padding: 5px 12px; font-size: 12px; border: 1px solid #d93025; border-radius: 6px;
+      background: none; color: #d93025;
+    }
+
+    .preview-pane { position: sticky; top: 20px; min-width: 0; }
+    @media (max-width: 900px) { .preview-pane { position: static; } }
+
+    .empty-state {
+      background: #fff; border: 1px dashed #dadce0; border-radius: 12px;
+      padding: 48px 24px; text-align: center; color: #5f6368; font-size: 14px;
+    }
+    .empty-state .icon { font-size: 32px; margin-bottom: 10px; }
+
+    #preview {
+      background: #fff; border: 1px solid #e3e5e8; border-radius: 12px; overflow: hidden;
+    }
+    .preview-toolbar {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 10px 16px; border-bottom: 1px solid #e3e5e8; background: #fafbfc;
+    }
+    .preview-toolbar .group { display: flex; gap: 6px; }
+    .preview-body { padding: 20px; max-height: calc(100vh - 220px); overflow-y: auto; }
+    @media (max-width: 900px) { .preview-body { max-height: none; } }
+
+    .form-title-input {
+      width: 100%; font-size: 20px; font-weight: 600; border: none; border-bottom: 2px solid transparent;
+      padding: 4px 0; margin-bottom: 4px;
+    }
+    .form-title-input:focus { outline: none; border-bottom-color: #4d5bf9; }
+    .form-desc-input {
+      width: 100%; font-size: 13px; color: #5f6368; border: none; border-bottom: 1px solid transparent;
+      padding: 4px 0; margin-bottom: 12px; resize: vertical;
+    }
+    .form-desc-input:focus { outline: none; border-bottom-color: #4d5bf9; }
+
+    .assumptions { background: #fef7e0; border-radius: 8px; padding: 10px 12px; margin-bottom: 16px; }
     .assumptions-label { font-size: 12px; font-weight: 600; color: #7a5b00; }
     .assumptions ul { margin: 4px 0 0; padding-left: 18px; font-size: 13px; color: #5f4b00; }
-    .qcard { border-top: 1px solid #eee; padding: 10px 0; }
-    .qcard:first-of-type { border-top: none; }
-    .qtitle { font-size: 14px; }
-    .qtitle .required-star { color: #c5221f; }
-    .qtype { font-size: 12px; color: #5f6368; margin-top: 2px; }
-    .qoptions { margin: 4px 0 0; padding-left: 18px; font-size: 13px; color: #3c4043; }
-    #preview .actions { display: flex; gap: 8px; margin-top: 12px; }
+
+    .quality-report { background: #f0fdf4; border: 1px solid #bbf0cc; border-radius: 8px; padding: 14px; margin-bottom: 16px; }
+    .quality-report.hidden { display: none; }
+    .quality-summary { display: flex; gap: 18px; flex-wrap: wrap; font-size: 13px; margin-bottom: 8px; }
+    .quality-summary b { font-size: 16px; }
+    .quality-issue { border-top: 1px solid #dcefe1; padding: 8px 0; font-size: 13px; }
+    .quality-issue:first-of-type { border-top: none; }
+    .severity-tag { font-size: 10px; font-weight: 700; text-transform: uppercase; padding: 2px 6px; border-radius: 4px; margin-right: 6px; }
+    .severity-high { background: #fce8e6; color: #c5221f; }
+    .severity-medium { background: #fef7e0; color: #7a5b00; }
+    .severity-low { background: #e8eaed; color: #5f6368; }
+    .quality-issue .apply-fix { margin-top: 4px; }
+    .quality-suggestions { font-size: 13px; margin-top: 8px; padding-left: 18px; }
+
+    .q-card { border: 1px solid #e3e5e8; border-radius: 8px; padding: 12px; margin-bottom: 10px; }
+    .q-card-header { display: flex; align-items: center; gap: 8px; }
+    .q-number { font-size: 13px; color: #5f6368; flex-shrink: 0; }
+    .q-title-input { flex: 1; min-width: 0; border: none; border-bottom: 1px solid transparent; padding: 4px 2px; font-size: 14px; }
+    .q-title-input:focus { outline: none; border-bottom-color: #4d5bf9; }
+    .q-card-actions { display: flex; gap: 2px; flex-shrink: 0; }
+    .q-card-body { display: flex; align-items: center; gap: 14px; margin-top: 8px; flex-wrap: wrap; }
+    .q-type-select { padding: 5px 8px; border-radius: 6px; border: 1px solid #dadce0; }
+    .q-required { display: flex; align-items: center; gap: 5px; font-size: 12px; color: #5f6368; }
+    .q-options { margin-top: 8px; }
+    .q-option-row { display: flex; align-items: center; gap: 6px; margin-bottom: 5px; }
+    .q-option-row input { flex: 1; min-width: 0; padding: 5px 8px; border-radius: 6px; border: 1px solid #dadce0; }
+    .q-scale { display: flex; gap: 12px; margin-top: 8px; font-size: 13px; align-items: center; }
+    .q-scale input { width: 55px; padding: 5px 8px; border-radius: 6px; border: 1px solid #dadce0; }
+    .add-option-btn { font-size: 12px; padding: 5px 10px; }
+
+    .preview-footer { display: flex; gap: 8px; margin-top: 4px; }
+
     #result { margin-top: 16px; display: flex; flex-direction: column; align-items: flex-start; gap: 12px; }
     #result a { font-size: 16px; }
     .hidden { display: none; }
-    #error { color: #c5221f; margin-top: 8px; display: flex; align-items: center; gap: 10px; }
-    #error.hidden { display: none; }
-    #error button { padding: 5px 12px; font-size: 12px; border: 1px solid #c5221f; border-radius: 6px; background: none; color: #c5221f; }
+
+    #toast-container { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; gap: 8px; z-index: 100; }
+    .toast {
+      background: #202124; color: #fff; padding: 10px 16px; border-radius: 8px; font-size: 13px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2); animation: toast-in 0.15s ease-out;
+    }
+    @keyframes toast-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+
+    #confirm-dialog {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.35); display: flex;
+      align-items: center; justify-content: center; z-index: 200;
+    }
+    #confirm-dialog.hidden { display: none; }
+    .dialog-box { background: #fff; border-radius: 10px; padding: 20px; width: min(340px, calc(100vw - 32px)); box-shadow: 0 4px 20px rgba(0,0,0,0.2); }
+    .dialog-box p { font-size: 14px; margin: 0 0 16px; }
+    .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; }
   </style>
 </head>
 <body>
   <div class="topbar">
     <h1>Form Pilot</h1>
-    <button id="start-over" type="button">Start over</button>
+    <div class="top-actions">
+      <button id="start-over" class="btn" type="button">Start over</button>
+    </div>
   </div>
-  <p>Describe the form you need. You may be asked 1-2 clarifying questions first.</p>
 
-  <div id="chat"></div>
+  <div class="layout">
+    <div class="chat-pane">
+      <p class="intro">Describe the form you need. You may be asked 1-2 clarifying questions first.</p>
+      <div id="chat"></div>
+      <form id="composer">
+        <input id="message" type="text" placeholder="e.g. I need a customer satisfaction survey for a restaurant" autocomplete="off" />
+        <button type="submit" class="btn btn-primary">Send</button>
+      </form>
+      <div id="error" class="hidden"></div>
+    </div>
 
-  <form id="composer">
-    <input id="message" type="text" placeholder="e.g. I need a customer satisfaction survey for a restaurant" autocomplete="off" />
-    <button type="submit">Send</button>
-  </form>
+    <div class="preview-pane">
+      <div id="preview-empty" class="empty-state">
+        <div class="icon">📝</div>
+        <div>Your form will appear here once Form Pilot has enough information.</div>
+      </div>
 
-  <div id="preview" class="hidden"></div>
-  <div id="result" class="hidden"></div>
-  <div id="error" class="hidden"></div>
+      <div id="preview" class="hidden">
+        <div class="preview-toolbar">
+          <div class="group">
+            <button id="undo-btn" class="icon-btn" type="button" title="Undo">↶</button>
+            <button id="redo-btn" class="icon-btn" type="button" title="Redo">↷</button>
+          </div>
+          <div class="group">
+            <button id="quality-btn" class="btn" type="button">Check quality</button>
+          </div>
+        </div>
+        <div class="preview-body">
+          <div id="quality-report" class="quality-report hidden"></div>
+          <div id="preview-content"></div>
+          <div class="preview-footer">
+            <button id="confirm-btn" class="btn btn-primary" type="button">Confirm and create form</button>
+            <button id="cancel-btn" class="btn" type="button">Cancel</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="result" class="hidden"></div>
+    </div>
+  </div>
+
+  <div id="toast-container"></div>
+
+  <div id="confirm-dialog" class="hidden">
+    <div class="dialog-box">
+      <p id="dialog-message"></p>
+      <div class="dialog-actions">
+        <button id="dialog-no" class="btn" type="button">Cancel</button>
+        <button id="dialog-yes" class="btn btn-danger" type="button">Delete</button>
+      </div>
+    </div>
+  </div>
 
   <script src="app.js"></script>
 </body>

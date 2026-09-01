@@ -63,3 +63,24 @@ class ClarificationReady(BaseModel):
 ClarificationDecision = Annotated[
     Union[NeedClarification, ClarificationReady], Field(discriminator="status")
 ]
+
+
+class QualityIssue(BaseModel):
+    severity: Literal["high", "medium", "low"]
+    description: str
+    question_index: int | None = None
+    fix_instruction: str | None = None
+
+
+class QualityAssessment(BaseModel):
+    clarity_score: int = Field(ge=0, le=100)
+    issues: list[QualityIssue] = Field(default_factory=list)
+    suggestions: list[str] = Field(default_factory=list)
+
+
+class QualityReport(BaseModel):
+    clarity_score: int
+    estimated_minutes: float
+    question_count: int
+    issues: list[QualityIssue] = Field(default_factory=list)
+    suggestions: list[str] = Field(default_factory=list)

@@ -10,6 +10,8 @@ class ConversationState:
     assumptions: list[str] = field(default_factory=list)
     plan: FormPlan | None = None
     awaiting_confirmation: bool = False
+    undo_stack: list[FormPlan] = field(default_factory=list)
+    redo_stack: list[FormPlan] = field(default_factory=list)
 
 
 _SESSIONS: dict[str, ConversationState] = {}

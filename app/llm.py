@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 from google import genai
 from pydantic import TypeAdapter, ValidationError
 
-from app.models import ClarificationDecision, FormPlan
+from app.models import ClarificationDecision, FormPlan, QualityAssessment
 
 load_dotenv()
 
@@ -13,6 +13,7 @@ _model = "gemini-flash-lite-latest"
 
 _clarification_adapter = TypeAdapter(ClarificationDecision)
 _plan_adapter = TypeAdapter(FormPlan)
+_quality_adapter = TypeAdapter(QualityAssessment)
 
 
 class LLMOutputError(Exception):
@@ -83,6 +84,36 @@ Respond with a single JSON object matching this shape, nothing else:
 
 Valid question types: SHORT_ANSWER, PARAGRAPH, MULTIPLE_CHOICE, CHECKBOXES, DROPDOWN, \
 LINEAR_SCALE."""
+
+
+QUALITY_CHECK_SYSTEM_PROMPT = """You are the quality-check stage of a form-building \
+agent. You are given a form plan as JSON. Assess its quality for real-world use.
+
+Rules:
+- clarity_score: an integer 0-100 rating how clear and unambiguous the questions are \
+overall.
+- issues: list concrete problems such as duplicate/near-duplicate questions, \
+confusing or biased wording, a question type that doesn't fit its content (e.g. an \
+open-ended text question where a rating scale would produce more useful data), \
+missing answer options, or a question that doesn't match the form's apparent \
+purpose. For each issue set question_index to the 0-based index of the primary \
+question it concerns (or null if it's about the form generally), a short \
+description, and — only if there is a single unambiguous fix — a fix_instruction \
+written as an imperative editing instruction (e.g. "Combine questions 3 and 5 into \
+one question" or "Change question 2 to a LINEAR_SCALE from 1 to 5") suitable for \
+applying automatically. Omit fix_instruction (set it to null) when there's no single \
+unambiguous fix.
+- suggestions: general improvement ideas not tied to one specific question (e.g. \
+"Consider making some required questions optional to improve completion rate").
+- Do not invent problems that aren't there. If the form is solid, return a high \
+clarity_score, an empty issues list, and few or no suggestions.
+
+Respond with a single JSON object matching this shape, nothing else:
+{"clarity_score": <int 0-100>,
+ "issues": [{"severity": "high"|"medium"|"low", "description": "<text>",
+             "question_index": <int or null>,
+             "fix_instruction": "<imperative instruction or null>"}],
+ "suggestions": ["<text>", ...]}"""
 
 
 def _to_contents(conversation: list[dict[str, str]]) -> list[dict]:
@@ -184,3 +215,17 @@ def run_edit_step(
         }
     ]
     return _generate_validated(contents, EDIT_SYSTEM_PROMPT, _plan_adapter, max_retries)
+
+
+def run_quality_check_step(
+    plan: FormPlan, max_retries: int = 2
+) -> QualityAssessment:
+    contents = [
+        {
+            "role": "user",
+            "parts": [{"text": f"Form plan:\n{plan.model_dump_json()}"}],
+        }
+    ]
+    return _generate_validated(
+        contents, QUALITY_CHECK_SYSTEM_PROMPT, _quality_adapter, max_retries
+    )

@@ -57,6 +57,15 @@
     @media (max-width: 900px) { .chat-pane { height: 60vh; } }
 
     .intro { font-size: 13px; color: #5f6368; margin: 0 0 12px; }
+    .lang-tone-row { display: flex; gap: 14px; margin-bottom: 10px; }
+    .lang-tone-row label { font-size: 11px; color: #5f6368; display: flex; flex-direction: column; gap: 3px; }
+    .lang-tone-row select { padding: 5px 6px; border-radius: 6px; border: 1px solid #dadce0; font-size: 12px; }
+    #preview-content[dir="rtl"] { text-align: right; }
+    #preview-content[dir="rtl"] .q-card-header,
+    #preview-content[dir="rtl"] .q-card-body,
+    #preview-content[dir="rtl"] .q-option-row,
+    #preview-content[dir="rtl"] .quality-summary { flex-direction: row-reverse; }
+    #preview-content[dir="rtl"] .q-scale { direction: ltr; justify-content: flex-end; }
     #chat { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; padding-right: 4px; }
     .msg-wrap { display: flex; flex-direction: column; max-width: 85%; }
     .msg-wrap.user { align-self: flex-end; align-items: flex-end; }
@@ -182,6 +191,26 @@
   <div class="layout">
     <div class="chat-pane">
       <p class="intro">Describe the form you need. You may be asked 1-2 clarifying questions first.</p>
+      <div class="lang-tone-row">
+        <label>Language
+          <select id="language-select">
+            <option>English</option>
+            <option>Arabic</option>
+            <option>French</option>
+          </select>
+        </label>
+        <label>Tone
+          <select id="tone-select">
+            <option value="neutral and professional">Professional</option>
+            <option value="friendly">Friendly</option>
+            <option value="casual">Casual</option>
+            <option value="academic">Academic</option>
+            <option value="corporate">Corporate</option>
+            <option value="marketing">Marketing</option>
+            <option value="formal">Formal</option>
+          </select>
+        </label>
+      </div>
       <div id="chat"></div>
       <form id="composer">
         <input id="message" type="text" placeholder="e.g. I need a customer satisfaction survey for a restaurant" autocomplete="off" />

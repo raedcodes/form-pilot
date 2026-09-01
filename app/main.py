@@ -23,6 +23,8 @@ app = FastAPI(title="form-pilot")
 class ChatRequest(BaseModel):
     session_id: str
     message: str
+    language: str = "English"
+    tone: str = "neutral and professional"
 
 
 class ConfirmRequest(BaseModel):
@@ -50,7 +52,7 @@ def health():
 @app.post("/chat")
 def chat(req: ChatRequest):
     try:
-        return handle_user_message(req.session_id, req.message)
+        return handle_user_message(req.session_id, req.message, req.language, req.tone)
     except LLMOutputError as e:
         raise HTTPException(status_code=502, detail=str(e))
     except AgentError as e:

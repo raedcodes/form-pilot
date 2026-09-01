@@ -28,12 +28,17 @@ def _status_fields(state) -> dict:
     return {"can_undo": bool(state.undo_stack), "can_redo": bool(state.redo_stack)}
 
 
-def handle_user_message(session_id: str, message: str) -> dict:
+def handle_user_message(
+    session_id: str,
+    message: str,
+    language: str = "English",
+    tone: str = "neutral and professional",
+) -> dict:
     state = get_or_create_session(session_id)
 
     if state.awaiting_confirmation and state.plan is not None:
         _push_undo(state)
-        updated_plan = run_edit_step(state.plan, message)
+        updated_plan = run_edit_step(state.plan, message, language, tone)
         state.plan = updated_plan
         return {
             "type": "preview",
@@ -61,7 +66,7 @@ def handle_user_message(session_id: str, message: str) -> dict:
     assumptions = decision.assumptions if decision.status == "ready" else []
     state.assumptions = assumptions
     _push_undo(state)
-    plan = run_design_step(state.conversation, assumptions)
+    plan = run_design_step(state.conversation, assumptions, language, tone)
     state.plan = plan
     state.awaiting_confirmation = True
     return {

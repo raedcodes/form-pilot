@@ -10,6 +10,8 @@ const qualityReportEl = document.getElementById("quality-report");
 const resultEl = document.getElementById("result");
 const errorEl = document.getElementById("error");
 const startOverBtn = document.getElementById("start-over");
+const languageSelect = document.getElementById("language-select");
+const toneSelect = document.getElementById("tone-select");
 const undoBtn = document.getElementById("undo-btn");
 const redoBtn = document.getElementById("redo-btn");
 const qualityBtn = document.getElementById("quality-btn");
@@ -170,6 +172,7 @@ function renderPreview(plan, assumptions) {
   previewEmptyEl.classList.add("hidden");
   previewEl.classList.remove("hidden");
   previewContentEl.innerHTML = "";
+  previewContentEl.dir = languageSelect.value === "Arabic" ? "rtl" : "ltr";
   hideQualityReport();
   updateUndoRedoButtons();
 
@@ -591,7 +594,12 @@ async function sendChatMessage(text) {
     const res = await fetch("/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ session_id: sessionId, message: text }),
+      body: JSON.stringify({
+        session_id: sessionId,
+        message: text,
+        language: languageSelect.value,
+        tone: toneSelect.value,
+      }),
     });
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));

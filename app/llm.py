@@ -40,9 +40,9 @@ Respond with a single JSON object matching one of these two shapes, nothing else
 {{"status": "ready", "assumptions": ["<assumption 1>", "<assumption 2>", ...]}}"""
 
 
-DESIGN_SYSTEM_PROMPT = """You are the design stage of a form-building agent. You are \
-given the user's request, any clarifying question/answer exchanges, and a list of \
-assumptions already agreed on. Produce a structured Google Form plan.
+DESIGN_SYSTEM_PROMPT_TEMPLATE = """You are the design stage of a form-building agent. \
+You are given the user's request, any clarifying question/answer exchanges, and a \
+list of assumptions already agreed on. Produce a structured Google Form plan.
 
 Rules:
 - Never invent a question the user didn't ask for or imply.
@@ -55,32 +55,42 @@ choice among many options, CHECKBOXES for multi-select, SHORT_ANSWER for brief f
 text, PARAGRAPH for longer free text.
 - Mark a question required only if the form's purpose would be undermined by it \
 being skipped.
+- Write all form content (title, description, question text, option text) in \
+{language}, in a {tone} tone. Keep terminology for the same concept consistent \
+throughout the form (e.g. don't switch between two different words for "rating"). \
+If {language} is not English, do not mix in English words or phrases unless they \
+are proper nouns with no natural translation.
 
-Respond with a single JSON object matching this shape, nothing else:
-{"title": "<form title>", "description": "<short description, can be empty string>",
+Respond with a single JSON object matching this shape, nothing else — the JSON keys \
+themselves stay in English, only the text values are written in {language}:
+{{"title": "<form title>", "description": "<short description, can be empty string>",
  "questions": [
-     {"title": "<question text>", "type": "<QUESTION_TYPE>", "required": <bool>,
+     {{"title": "<question text>", "type": "<QUESTION_TYPE>", "required": <bool>,
       "options": ["<opt1>", "<opt2>", ...],  // only for MULTIPLE_CHOICE/CHECKBOXES/DROPDOWN
-      "scale_min": <int>, "scale_max": <int>}  // only for LINEAR_SCALE
- ]}
+      "scale_min": <int>, "scale_max": <int>}}  // only for LINEAR_SCALE
+ ]}}
 
 Valid question types: SHORT_ANSWER, PARAGRAPH, MULTIPLE_CHOICE, CHECKBOXES, DROPDOWN, \
 LINEAR_SCALE. Only include "options" for choice-type questions, and only include \
 "scale_min"/"scale_max" for LINEAR_SCALE questions."""
 
 
-EDIT_SYSTEM_PROMPT = """You are the edit stage of a form-building agent. You are \
-given the current form plan as JSON and an instruction describing a change the user \
-wants. Apply ONLY the requested change and return the complete updated plan (every \
-question, not just the changed one), leaving everything else exactly as it was.
+EDIT_SYSTEM_PROMPT_TEMPLATE = """You are the edit stage of a form-building agent. You \
+are given the current form plan as JSON and an instruction describing a change the \
+user wants. Apply ONLY the requested change and return the complete updated plan \
+(every question, not just the changed one), leaving everything else exactly as it was.
+
+The form's content should stay in {language}, in a {tone} tone, unless the requested \
+change explicitly asks to change the language or tone — in that case apply the new \
+language/tone to the whole form, not just the part mentioned.
 
 Respond with a single JSON object matching this shape, nothing else:
-{"title": "<form title>", "description": "<description>",
+{{"title": "<form title>", "description": "<description>",
  "questions": [
-     {"title": "<question text>", "type": "<QUESTION_TYPE>", "required": <bool>,
+     {{"title": "<question text>", "type": "<QUESTION_TYPE>", "required": <bool>,
       "options": ["<opt1>", "<opt2>", ...],  // only for MULTIPLE_CHOICE/CHECKBOXES/DROPDOWN
-      "scale_min": <int>, "scale_max": <int>}  // only for LINEAR_SCALE
- ]}
+      "scale_min": <int>, "scale_max": <int>}}  // only for LINEAR_SCALE
+ ]}}
 
 Valid question types: SHORT_ANSWER, PARAGRAPH, MULTIPLE_CHOICE, CHECKBOXES, DROPDOWN, \
 LINEAR_SCALE."""
@@ -184,6 +194,8 @@ def run_clarification_step(
 def run_design_step(
     conversation: list[dict[str, str]],
     assumptions: list[str],
+    language: str = "English",
+    tone: str = "neutral and professional",
     max_retries: int = 2,
 ) -> FormPlan:
     contents = _to_contents(conversation)
@@ -195,11 +207,16 @@ def run_design_step(
                 "parts": [{"text": f"Assumptions to use:\n{assumptions_text}"}],
             }
         )
-    return _generate_validated(contents, DESIGN_SYSTEM_PROMPT, _plan_adapter, max_retries)
+    system_prompt = DESIGN_SYSTEM_PROMPT_TEMPLATE.format(language=language, tone=tone)
+    return _generate_validated(contents, system_prompt, _plan_adapter, max_retries)
 
 
 def run_edit_step(
-    plan: FormPlan, instruction: str, max_retries: int = 2
+    plan: FormPlan,
+    instruction: str,
+    language: str = "English",
+    tone: str = "neutral and professional",
+    max_retries: int = 2,
 ) -> FormPlan:
     contents = [
         {
@@ -214,7 +231,8 @@ def run_edit_step(
             ],
         }
     ]
-    return _generate_validated(contents, EDIT_SYSTEM_PROMPT, _plan_adapter, max_retries)
+    system_prompt = EDIT_SYSTEM_PROMPT_TEMPLATE.format(language=language, tone=tone)
+    return _generate_validated(contents, system_prompt, _plan_adapter, max_retries)
 
 
 def run_quality_check_step(

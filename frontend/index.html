@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Form Pilot</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 640px; margin: 40px auto; padding: 0 16px; color: #202124; }
+    h1 { font-size: 20px; }
+    .topbar { display: flex; justify-content: space-between; align-items: baseline; }
+    .topbar button { font-size: 12px; padding: 6px 10px; background: none; border: 1px solid #dadce0; border-radius: 6px; }
+    #chat { display: flex; flex-direction: column; gap: 12px; margin-bottom: 16px; }
+    .msg-wrap { display: flex; flex-direction: column; max-width: 80%; }
+    .msg-wrap.user { align-self: flex-end; align-items: flex-end; }
+    .msg-wrap.agent { align-self: flex-start; align-items: flex-start; }
+    .msg-label { font-size: 11px; color: #5f6368; margin-bottom: 3px; margin-left: 2px; }
+    .msg { padding: 10px 14px; border-radius: 8px; white-space: pre-wrap; }
+    .msg.user { background: #e8eaed; }
+    .msg.agent { background: #e8f0fe; }
+    .msg.loading { color: #5f6368; animation: pulse 1.2s ease-in-out infinite; }
+    @keyframes pulse { 0%, 100% { opacity: 0.4; } 50% { opacity: 1; } }
+    button:disabled, input:disabled { opacity: 0.6; cursor: default; }
+    #composer { display: flex; gap: 8px; }
+    #composer input { flex: 1; padding: 10px; font-size: 14px; }
+    button { padding: 10px 16px; font-size: 14px; cursor: pointer; }
+    #preview { border: 1px solid #dadce0; border-radius: 8px; padding: 16px; margin-top: 16px; }
+    #preview h2 { margin-top: 0; font-size: 16px; }
+    .qcard { border-top: 1px solid #eee; padding: 10px 0; }
+    .qcard:first-of-type { border-top: none; }
+    .qtitle { font-size: 14px; }
+    .qtitle .required-star { color: #c5221f; }
+    .qtype { font-size: 12px; color: #5f6368; margin-top: 2px; }
+    .qoptions { margin: 4px 0 0; padding-left: 18px; font-size: 13px; color: #3c4043; }
+    #preview .actions { display: flex; gap: 8px; margin-top: 12px; }
+    #result { margin-top: 16px; }
+    #result a { font-size: 16px; }
+    .hidden { display: none; }
+    #error { color: #c5221f; margin-top: 8px; }
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <h1>Form Pilot</h1>
+    <button id="start-over" type="button">Start over</button>
+  </div>
+  <p>Describe the form you need. You may be asked 1-2 clarifying questions first.</p>
+
+  <div id="chat"></div>
+
+  <form id="composer">
+    <input id="message" type="text" placeholder="e.g. I need a customer satisfaction survey for a restaurant" autocomplete="off" />
+    <button type="submit">Send</button>
+  </form>
+
+  <div id="preview" class="hidden"></div>
+  <div id="result" class="hidden"></div>
+  <div id="error" class="hidden"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>

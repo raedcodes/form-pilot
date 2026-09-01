@@ -7,6 +7,7 @@ from app.models import FormPlan
 class ConversationState:
     conversation: list[dict[str, str]] = field(default_factory=list)
     clarification_rounds: int = 0
+    assumptions: list[str] = field(default_factory=list)
     plan: FormPlan | None = None
     awaiting_confirmation: bool = False
 

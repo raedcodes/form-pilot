@@ -17,7 +17,7 @@ for i, message in enumerate(turns, start=1):
     if result["type"] == "clarification":
         print(f"agent asks: {result['question']}")
     else:
-        print("agent produced a plan:")
+        print(f"agent produced a plan. assumptions: {result['assumptions']}")
         print(json.dumps(result["plan"].model_dump(), indent=2))
         break
     print()

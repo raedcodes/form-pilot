@@ -19,6 +19,9 @@ const TYPE_LABELS = {
 
 let currentPlan = null;
 
+const DEFAULT_PLACEHOLDER = messageEl.placeholder;
+const EDIT_PLACEHOLDER = 'e.g. "make question 3 optional" or "remove the email question"';
+
 function addMessage(text, who) {
   const wrap = document.createElement("div");
   wrap.className = `msg-wrap ${who}`;
@@ -46,17 +49,32 @@ function addLoadingMessage(text) {
   return wrap;
 }
 
-function showError(text) {
-  errorEl.textContent = text;
+function showError(text, retry) {
+  errorEl.innerHTML = "";
+
+  const msg = document.createElement("span");
+  msg.textContent = text;
+  errorEl.appendChild(msg);
+
+  if (retry) {
+    const retryBtn = document.createElement("button");
+    retryBtn.textContent = "Retry";
+    retryBtn.onclick = () => {
+      clearError();
+      retry();
+    };
+    errorEl.appendChild(retryBtn);
+  }
+
   errorEl.classList.remove("hidden");
 }
 
 function clearError() {
   errorEl.classList.add("hidden");
-  errorEl.textContent = "";
+  errorEl.innerHTML = "";
 }
 
-function renderPreview(plan) {
+function renderPreview(plan, assumptions) {
   currentPlan = plan;
   previewEl.innerHTML = "";
   previewEl.classList.remove("hidden");
@@ -71,13 +89,32 @@ function renderPreview(plan) {
     previewEl.appendChild(desc);
   }
 
-  for (const q of plan.questions) {
+  if (assumptions && assumptions.length) {
+    const box = document.createElement("div");
+    box.className = "assumptions";
+
+    const label = document.createElement("div");
+    label.className = "assumptions-label";
+    label.textContent = "Assumptions made — double-check these:";
+    box.appendChild(label);
+
+    const list = document.createElement("ul");
+    for (const a of assumptions) {
+      const li = document.createElement("li");
+      li.textContent = a;
+      list.appendChild(li);
+    }
+    box.appendChild(list);
+    previewEl.appendChild(box);
+  }
+
+  for (const [i, q] of plan.questions.entries()) {
     const card = document.createElement("div");
     card.className = "qcard";
 
     const titleRow = document.createElement("div");
     titleRow.className = "qtitle";
-    titleRow.textContent = q.title;
+    titleRow.textContent = `${i + 1}. ${q.title}`;
     if (q.required) {
       const star = document.createElement("span");
       star.className = "required-star";
@@ -113,23 +150,34 @@ function renderPreview(plan) {
 
   const confirmBtn = document.createElement("button");
   confirmBtn.textContent = "Confirm and create form";
-  confirmBtn.onclick = onConfirm;
+  confirmBtn.onclick = () => confirmForm(confirmBtn);
 
   const cancelBtn = document.createElement("button");
   cancelBtn.textContent = "Cancel";
-  cancelBtn.onclick = () => {
-    previewEl.classList.add("hidden");
-    currentPlan = null;
+  cancelBtn.onclick = async () => {
+    cancelBtn.disabled = true;
+    try {
+      await fetch("/cancel", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ session_id: sessionId }),
+      });
+    } finally {
+      previewEl.classList.add("hidden");
+      currentPlan = null;
+      messageEl.placeholder = DEFAULT_PLACEHOLDER;
+    }
   };
 
   actions.appendChild(confirmBtn);
   actions.appendChild(cancelBtn);
   previewEl.appendChild(actions);
+
+  messageEl.placeholder = EDIT_PLACEHOLDER;
 }
 
-async function onConfirm(e) {
+async function confirmForm(btn) {
   clearError();
-  const btn = e.target;
   const originalLabel = btn.textContent;
   btn.disabled = true;
   btn.textContent = "Creating form...";
@@ -145,6 +193,7 @@ async function onConfirm(e) {
     }
     const data = await res.json();
     previewEl.classList.add("hidden");
+    messageEl.placeholder = DEFAULT_PLACEHOLDER;
     resultEl.innerHTML = "";
     resultEl.classList.remove("hidden");
     const link = document.createElement("a");
@@ -152,26 +201,26 @@ async function onConfirm(e) {
     link.target = "_blank";
     link.textContent = "Open your Google Form";
     resultEl.appendChild(link);
+
+    const newFormBtn = document.createElement("button");
+    newFormBtn.textContent = "Start a new form";
+    newFormBtn.onclick = startOver;
+    resultEl.appendChild(newFormBtn);
   } catch (err) {
-    showError(err.message);
     btn.disabled = false;
     btn.textContent = originalLabel;
+    showError(err.message, () => confirmForm(btn));
   }
 }
 
 const sendBtn = composerEl.querySelector("button");
 
-composerEl.addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const text = messageEl.value.trim();
-  if (!text) return;
+async function sendChatMessage(text) {
+  const isEditing = !previewEl.classList.contains("hidden");
 
-  clearError();
-  addMessage(text, "user");
-  messageEl.value = "";
   messageEl.disabled = true;
   sendBtn.disabled = true;
-  const loadingMsg = addLoadingMessage("Thinking...");
+  const loadingMsg = addLoadingMessage(isEditing ? "Updating your form..." : "Thinking...");
 
   try {
     const res = await fetch("/chat", {
@@ -188,20 +237,36 @@ composerEl.addEventListener("submit", async (e) => {
     if (data.type === "clarification") {
       addMessage(data.question, "agent");
     } else if (data.type === "preview") {
-      addMessage("Here's the form I'd create. Review it below.", "agent");
-      renderPreview(data.plan);
+      addMessage(
+        data.edited
+          ? "Updated the plan below."
+          : "Here's the form I'd create. Review it below.",
+        "agent"
+      );
+      renderPreview(data.plan, data.assumptions);
     }
   } catch (err) {
     loadingMsg.remove();
-    showError(err.message);
+    showError(err.message, () => sendChatMessage(text));
   } finally {
     messageEl.disabled = false;
     sendBtn.disabled = false;
     messageEl.focus();
   }
+}
+
+composerEl.addEventListener("submit", (e) => {
+  e.preventDefault();
+  const text = messageEl.value.trim();
+  if (!text) return;
+
+  clearError();
+  addMessage(text, "user");
+  messageEl.value = "";
+  sendChatMessage(text);
 });
 
-startOverBtn.addEventListener("click", () => {
+function startOver() {
   sessionId = crypto.randomUUID();
   chatEl.innerHTML = "";
   previewEl.classList.add("hidden");
@@ -211,5 +276,8 @@ startOverBtn.addEventListener("click", () => {
   clearError();
   currentPlan = null;
   messageEl.value = "";
+  messageEl.placeholder = DEFAULT_PLACEHOLDER;
   messageEl.focus();
-});
+}
+
+startOverBtn.addEventListener("click", startOver);

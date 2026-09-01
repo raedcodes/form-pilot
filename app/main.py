@@ -2,7 +2,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from app.agent import AgentError, confirm_plan, handle_user_message
+from app.agent import AgentError, cancel_preview, confirm_plan, handle_user_message
 from app.google_forms import GoogleFormsError, create_google_form
 from app.llm import LLMOutputError
 from app.session_store import reset_session
@@ -16,6 +16,10 @@ class ChatRequest(BaseModel):
 
 
 class ConfirmRequest(BaseModel):
+    session_id: str
+
+
+class CancelRequest(BaseModel):
     session_id: str
 
 
@@ -48,6 +52,12 @@ def confirm(req: ConfirmRequest):
 
     reset_session(req.session_id)
     return {"url": url}
+
+
+@app.post("/cancel")
+def cancel(req: CancelRequest):
+    cancel_preview(req.session_id)
+    return {"status": "ok"}
 
 
 app.mount("/", StaticFiles(directory="frontend", html=True), name="frontend")

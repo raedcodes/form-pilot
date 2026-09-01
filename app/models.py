@@ -50,16 +50,16 @@ class FormPlan(BaseModel):
     questions: list[Question] = Field(min_length=1)
 
 
-class ClarifyingQuestion(BaseModel):
+class NeedClarification(BaseModel):
     status: Literal["need_clarification"]
     question: str
 
 
-class ReadyPlan(BaseModel):
+class ClarificationReady(BaseModel):
     status: Literal["ready"]
-    plan: FormPlan
+    assumptions: list[str] = Field(default_factory=list)
 
 
-AgentResponse = Annotated[
-    Union[ClarifyingQuestion, ReadyPlan], Field(discriminator="status")
+ClarificationDecision = Annotated[
+    Union[NeedClarification, ClarificationReady], Field(discriminator="status")
 ]

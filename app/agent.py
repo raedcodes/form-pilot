@@ -1,13 +1,8 @@
-from app.llm import get_agent_response
+from app.llm import run_clarification_step, run_design_step, run_edit_step
 from app.models import FormPlan
-from app.session_store import ConversationState, get_or_create_session
+from app.session_store import get_or_create_session
 
 MAX_CLARIFICATION_ROUNDS = 2
-
-FORCE_READY_NOTICE = (
-    "You have already used your 2 clarification rounds. You must respond with "
-    'status "ready" now, making reasonable assumptions for anything still unclear.'
-)
 
 
 class AgentError(Exception):
@@ -16,39 +11,38 @@ class AgentError(Exception):
 
 def handle_user_message(session_id: str, message: str) -> dict:
     state = get_or_create_session(session_id)
+
+    if state.awaiting_confirmation and state.plan is not None:
+        updated_plan = run_edit_step(state.plan, message)
+        state.plan = updated_plan
+        return {
+            "type": "preview",
+            "plan": updated_plan,
+            "assumptions": state.assumptions,
+            "edited": True,
+        }
+
     state.conversation.append({"role": "user", "content": message})
 
-    rounds_exhausted = state.clarification_rounds >= MAX_CLARIFICATION_ROUNDS
-    if rounds_exhausted:
-        state.conversation.append({"role": "user", "content": FORCE_READY_NOTICE})
+    round_number = state.clarification_rounds + 1
+    decision = run_clarification_step(
+        state.conversation, round_number, MAX_CLARIFICATION_ROUNDS
+    )
 
-    response = get_agent_response(state.conversation)
+    if decision.status == "need_clarification" and round_number <= MAX_CLARIFICATION_ROUNDS:
+        state.clarification_rounds += 1
+        state.conversation.append({"role": "model", "content": decision.question})
+        return {"type": "clarification", "question": decision.question}
 
-    if response.status == "need_clarification":
-        if rounds_exhausted:
-            # The model ignored the hard cap; force it once more instead of
-            # looping forever or silently dropping the question on the floor.
-            state.conversation.append(
-                {"role": "model", "content": response.model_dump_json()}
-            )
-            state.conversation.append({"role": "user", "content": FORCE_READY_NOTICE})
-            response = get_agent_response(state.conversation)
-            if response.status == "need_clarification":
-                raise AgentError(
-                    "LLM would not produce a plan after clarification rounds "
-                    "were exhausted"
-                )
-        else:
-            state.clarification_rounds += 1
-            state.conversation.append(
-                {"role": "model", "content": response.model_dump_json()}
-            )
-            return {"type": "clarification", "question": response.question}
-
-    state.plan = response.plan
+    # Either the model decided it has enough, or the round cap forced it to stop
+    # asking. If it ignored the cap and asked anyway, we override it here rather
+    # than looping — the hard cap is enforced in code, not just by the prompt.
+    assumptions = decision.assumptions if decision.status == "ready" else []
+    state.assumptions = assumptions
+    plan = run_design_step(state.conversation, assumptions)
+    state.plan = plan
     state.awaiting_confirmation = True
-    state.conversation.append({"role": "model", "content": response.model_dump_json()})
-    return {"type": "preview", "plan": response.plan}
+    return {"type": "preview", "plan": plan, "assumptions": assumptions, "edited": False}
 
 
 def confirm_plan(session_id: str) -> FormPlan:
@@ -56,3 +50,9 @@ def confirm_plan(session_id: str) -> FormPlan:
     if not state.awaiting_confirmation or state.plan is None:
         raise AgentError("No form plan is awaiting confirmation for this session")
     return state.plan
+
+
+def cancel_preview(session_id: str) -> None:
+    state = get_or_create_session(session_id)
+    state.awaiting_confirmation = False
+    state.plan = None
